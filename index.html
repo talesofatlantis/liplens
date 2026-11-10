@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LipLens</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{font-family:Inter,system-ui,-apple-system,sans-serif}
+  #captions span{margin-right:.35em}
+  #captions .low{opacity:.5}
+  input[type=range]{accent-color:#f59e0b}
+</style>
+</head>
+<body class="min-h-screen bg-zinc-100 text-zinc-900 antialiased">
+
+<header class="border-b border-zinc-200 bg-white">
+  <div class="mx-auto flex max-w-6xl flex-wrap items-end gap-3 px-4 py-3">
+    <div class="mr-2">
+      <h1 class="text-lg font-bold leading-none tracking-tight">LipLens</h1>
+      <p class="mt-1 text-xs text-zinc-500">Lip-only captions · Muse Ember</p>
+    </div>
+    <label class="grid gap-1 text-xs font-medium text-zinc-600">API key
+      <input id="key" type="password" autocomplete="off" placeholder="sk-or-… (memory only)" class="w-52 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200">
+    </label>
+    <label class="grid gap-1 text-xs font-medium text-zinc-600">Model
+      <input id="model" value="meta/muse-ember" class="w-48 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200">
+    </label>
+    <fieldset class="flex items-center gap-1 rounded-lg border border-zinc-300 p-1 text-sm">
+      <legend class="sr-only">Budget mode</legend>
+      <label class="cursor-pointer rounded-md px-2 py-1 has-[:checked]:bg-zinc-900 has-[:checked]:text-white"><input type="radio" name="mode" value="1" checked class="sr-only">$1</label>
+      <label class="cursor-pointer rounded-md px-2 py-1 has-[:checked]:bg-zinc-900 has-[:checked]:text-white"><input type="radio" name="mode" value="20" class="sr-only">$20</label>
+    </fieldset>
+    <button id="reset" type="button" class="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-200">Reset spend</button>
+  </div>
+</header>
+
+<main class="mx-auto grid max-w-6xl gap-4 px-4 py-4 lg:grid-cols-[1fr_300px]">
+  <section class="space-y-3">
+    <!-- Video on top, centered, white frame -->
+    <div class="mx-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <div class="relative flex aspect-video w-full items-center justify-center bg-white">
+        <video id="v" muted playsinline class="h-full w-full object-contain bg-white"></video>
+        <iframe id="yt" class="absolute inset-0 hidden h-full w-full" title="YouTube video" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+        <div id="empty" class="absolute inset-0 grid place-items-center bg-white p-6 text-center">
+          <div>
+            <p class="text-sm font-medium text-zinc-700">No video yet</p>
+            <p class="mt-1 text-xs text-zinc-400">Choose a source below to start.</p>
+            <img id="thumb" alt="" class="mx-auto mt-3 hidden max-h-40 rounded-lg object-contain">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Source picker under the video -->
+    <div class="mx-auto w-full max-w-3xl rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <div class="flex gap-1 rounded-xl bg-zinc-100 p-1" role="tablist" aria-label="Video source">
+        <button type="button" role="tab" data-src="file" aria-selected="true" class="src-tab flex-1 rounded-lg px-3 py-2 text-sm font-semibold bg-white text-zinc-900 shadow-sm">Upload file</button>
+        <button type="button" role="tab" data-src="webcam" aria-selected="false" class="src-tab flex-1 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900">Webcam</button>
+        <button type="button" role="tab" data-src="youtube" aria-selected="false" class="src-tab flex-1 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900">YouTube URL</button>
+      </div>
+
+      <div id="src-file" class="pt-3">
+        <label class="grid gap-1 text-xs font-medium text-zinc-600">Video file
+          <input id="file" type="file" accept="video/*" class="text-sm text-zinc-600 file:mr-2 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-800 hover:file:bg-zinc-200">
+        </label>
+      </div>
+
+      <div id="src-webcam" class="hidden pt-3">
+        <button id="cam" type="button" class="w-full rounded-lg bg-amber-400 px-3.5 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-1">Start webcam</button>
+        <p class="mt-2 text-xs text-zinc-400">Your camera stays local — only mouth crops are sent.</p>
+      </div>
+
+      <div id="src-youtube" class="hidden pt-3">
+        <form id="ytForm" class="flex gap-2">
+          <input id="ytUrl" type="url" placeholder="https://www.youtube.com/watch?v=…" class="min-w-0 flex-1 rounded-lg border border-zinc-300 px-2.5 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200">
+          <button type="submit" class="shrink-0 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700">Load</button>
+        </form>
+        <p class="mt-2 text-xs leading-relaxed text-zinc-400">YouTube plays inline, but browsers block reading its frames (cross-origin), so lip-reading needs the file or webcam. Download the clip and use Upload file.</p>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 text-sm text-zinc-600">
+      <span id="dot" class="h-2.5 w-2.5 rounded-full bg-zinc-400"></span>
+      <span id="stat">Loading face model…</span>
+      <span id="lat" class="text-zinc-400"></span>
+    </div>
+
+    <div id="captions" aria-live="polite" aria-label="Live captions" class="min-h-[88px] rounded-2xl bg-zinc-900 px-5 py-4 text-[28px] leading-snug text-white shadow-sm">Captions will appear here.</div>
+
+    <div class="flex flex-wrap gap-5 rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-600 shadow-sm">
+      <label class="flex items-center gap-2">Caption size
+        <input id="fs" type="range" min="18" max="52" value="28" class="w-32"><span id="fsv" class="w-10 text-xs text-zinc-400">28px</span>
+      </label>
+      <label class="flex items-center gap-2">Speech gate
+        <input id="gate" type="range" min="0" max="0.005" step="0.0001" value="0.0005" class="w-32"><span id="gatev" class="w-12 text-xs text-zinc-400">0.0005</span>
+      </label>
+    </div>
+  </section>
+
+  <aside class="space-y-4">
+    <section aria-label="Budget tracker" class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <h2 class="text-sm font-semibold">Budget</h2>
+      <div class="mt-3 h-2 overflow-hidden rounded-full bg-zinc-100"><div id="bar" class="h-full w-0 rounded-full bg-amber-400 transition-all"></div></div>
+      <p class="mt-2.5 text-sm"><b id="spent" class="font-semibold">$0.0000</b> <span class="text-zinc-400">/ <span id="cap">$1</span></span></p>
+      <dl class="mt-3 space-y-1.5 text-sm text-zinc-600">
+        <div class="flex justify-between"><dt>Calls</dt><dd id="calls" class="font-medium text-zinc-900">0</dd></div>
+        <div class="flex justify-between"><dt>Avg / call</dt><dd id="avg" class="font-medium text-zinc-900">$0</dd></div>
+        <div class="flex justify-between"><dt>Cost / min</dt><dd id="cpm" class="font-medium text-zinc-900">$0</dd></div>
+        <div class="flex justify-between"><dt>Remaining</dt><dd id="left" class="font-medium text-zinc-900">—</dd></div>
+      </dl>
+      <p id="budgetMsg" role="status" class="mt-2 text-sm font-medium text-red-600"></p>
+    </section>
+
+    <section aria-label="Accuracy" class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <h2 class="text-sm font-semibold">Accuracy <span class="font-normal text-zinc-400">(optional)</span></h2>
+      <label class="mt-2 grid gap-1 text-xs font-medium text-zinc-600">Reference transcript
+        <textarea id="ref" placeholder="Paste what was actually said…" class="min-h-[70px] rounded-lg border border-zinc-300 px-2.5 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"></textarea>
+      </label>
+      <p class="mt-2 text-sm text-zinc-600">Word error rate: <b id="wer" class="font-semibold text-zinc-900">—</b></p>
+    </section>
+  </aside>
+</main>
+
+<script type="module">
+import {FaceLandmarker,FilesetResolver} from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm';
+
+const $=id=>document.getElementById(id), v=$('v'), caps=$('captions'), stat=$('stat'), dot=$('dot');
+const MODES={'1':{cap:1,win:1.5,n:6,cols:3,rows:2,w:64,h:40,q:.6,gray:true,overlap:1},
+             '20':{cap:20,win:1.0,n:12,cols:4,rows:3,w:128,h:80,q:.8,gray:false,overlap:.5}};
+let landmarker,buf=[],history=[],inFlight=false,backoff=0,lastFire=0,lastCorrect=0,speechSec=0;
+let spent={},calls=0; try{spent=JSON.parse(localStorage.getItem('liplens-spent')||'{}')}catch{spent={}}
+const mode=()=>document.querySelector('input[name=mode]:checked').value;
+const persist=()=>{try{localStorage.setItem('liplens-spent',JSON.stringify(spent))}catch{}};
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+// Models sometimes wrap JSON in ```json fences or prose; take the first {...} block.
+const json=data=>JSON.parse(data.choices[0].message.content.match(/\{[\s\S]*\}/)[0]);
+
+const vision=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+landmarker=await FaceLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',delegate:'GPU'},runningMode:'VIDEO',numFaces:1});
+stat.textContent='Ready — choose a source below.';
+
+// --- Source picker ---
+let stream=null;
+function stopCam(){ if(stream){stream.getTracks().forEach(t=>t.stop()); stream=null; v.srcObject=null;} $('cam').textContent='Start webcam'; }
+function showVideo(){ $('yt').classList.add('hidden'); $('yt').removeAttribute('src'); $('empty').classList.add('hidden'); v.classList.remove('hidden'); }
+function setSource(name){
+  document.querySelectorAll('.src-tab').forEach(b=>{
+    const on=b.dataset.src===name;
+    b.setAttribute('aria-selected',on);
+    b.className='src-tab flex-1 rounded-lg px-3 py-2 text-sm '+(on?'font-semibold bg-white text-zinc-900 shadow-sm':'font-medium text-zinc-600 hover:text-zinc-900');
+  });
+  ['file','webcam','youtube'].forEach(s=>$('src-'+s).classList.toggle('hidden',s!==name));
+  if(name!=='webcam') stopCam();
+  if(name!=='youtube'){ $('yt').classList.add('hidden'); $('yt').removeAttribute('src'); $('thumb').classList.add('hidden'); v.classList.remove('hidden'); $('empty').classList.toggle('hidden',!!(v.src||v.srcObject)); }
+}
+document.querySelectorAll('.src-tab').forEach(b=>b.onclick=()=>setSource(b.dataset.src));
+
+$('file').onchange=e=>{const f=e.target.files[0]; if(f){stopCam(); showVideo(); v.src=URL.createObjectURL(f); v.play();}};
+$('cam').onclick=async()=>{
+  if(stream){stopCam(); v.pause(); $('empty').classList.remove('hidden'); return;}
+  try{ stream=await navigator.mediaDevices.getUserMedia({video:true}); }
+  catch(e){ stat.textContent='Camera unavailable ('+e.name+') — allow camera access for this page, or use Upload file.'; return; }
+  v.removeAttribute('src'); showVideo(); v.srcObject=stream; v.play(); $('cam').textContent='Stop webcam';
+};
+const ytId=u=>{try{const x=new URL(u.trim()); return x.hostname.includes('youtu.be')?x.pathname.slice(1):x.searchParams.get('v')||x.pathname.match(/\/(embed|shorts)\/([\w-]{6,})/)?.[2];}catch{return null}};
+$('ytForm').onsubmit=e=>{
+  e.preventDefault(); const id=ytId($('ytUrl').value);
+  if(!id){stat.textContent='Could not parse that YouTube URL.'; return;}
+  stopCam(); v.pause();
+  $('empty').classList.remove('hidden'); const th=$('thumb'); th.src=`https://i.ytimg.com/vi/${id}/hqdefault.jpg`; th.classList.remove('hidden');
+  $('yt').src=`https://www.youtube.com/embed/${id}?autoplay=1`; $('yt').classList.remove('hidden'); v.classList.add('hidden');
+  stat.textContent='YouTube is playing inline — use Upload file or Webcam for lip-reading (cross-origin).';
+};
+
+$('fs').oninput=e=>{caps.style.fontSize=e.target.value+'px'; $('fsv').textContent=e.target.value+'px'};
+$('gate').oninput=e=>$('gatev').textContent=(+e.target.value).toFixed(4);
+document.querySelectorAll('input[name=mode]').forEach(r=>r.onchange=()=>{lastFire=0; renderBudget();});
+$('reset').onclick=()=>{spent={}; calls=0; speechSec=0; history=[]; caps.textContent='Captions will appear here.'; persist(); renderBudget();};
+$('ref').oninput=renderWER;
+
+function renderBudget(){
+  const m=MODES[mode()], s=spent[mode()]||0;
+  $('cap').textContent='$'+m.cap; $('spent').textContent='$'+s.toFixed(4);
+  $('bar').style.width=Math.min(100,s/m.cap*100)+'%'; $('calls').textContent=calls;
+  $('avg').textContent='$'+(calls?(s/calls).toFixed(5):'0');
+  const cpm=speechSec>0? s/(speechSec/60):0;
+  $('cpm').textContent='$'+cpm.toFixed(4);
+  $('left').textContent=cpm>0? ((m.cap-s)/cpm).toFixed(1)+' min':'—';
+  $('budgetMsg').textContent=s>=m.cap?'Budget reached — calls stopped.':'';
+  $('bar').className='h-full rounded-full transition-all '+(s>=m.cap?'bg-red-500':'bg-amber-400');
+}
+function renderWER(){
+  const ref=$('ref').value.trim().toLowerCase().replace(/[^a-z0-9 ]/g,'').split(/\s+/).filter(Boolean);
+  if(!ref.length){$('wer').textContent='—';return;}
+  const hyp=history.map(h=>h.w).join(' ').toLowerCase().split(/\s+/).filter(Boolean);
+  const d=Array.from({length:ref.length+1},(_,i)=>[i,...Array(hyp.length).fill(0)]);
+  for(let j=0;j<=hyp.length;j++)d[0][j]=j;
+  for(let i=1;i<=ref.length;i++)for(let j=1;j<=hyp.length;j++)
+    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(ref[i-1]===hyp[j-1]?0:1));
+  $('wer').textContent=(d[ref.length][hyp.length]/ref.length*100).toFixed(1)+'%';
+}
+function renderCaps(){
+  caps.replaceChildren(...history.slice(-40).map(h=>{const s=document.createElement('span'); if(h.c<.4)s.className='low'; s.textContent=h.w; return s;}));
+  renderWER();
+}
+
+// Frame loop: crop mouth, push to buffer
+const crop=document.createElement('canvas');
+function onFrame(now){
+  if(v.readyState>=2 && landmarker){
+    const r=landmarker.detectForVideo(v,now), lm=r.faceLandmarks?.[0];
+    if(lm){
+      const m=MODES[mode()], open=dist(lm[13],lm[14])/Math.max(1e-6,dist(lm[61],lm[291]));
+      const pts=[61,291,0,17].map(i=>lm[i]);
+      let x0=Math.min(...pts.map(p=>p.x)),x1=Math.max(...pts.map(p=>p.x)),y0=Math.min(...pts.map(p=>p.y)),y1=Math.max(...pts.map(p=>p.y));
+      const pw=(x1-x0)*.25, ph=(y1-y0)*.25;
+      x0=Math.max(0,x0-pw); y0=Math.max(0,y0-ph); x1=Math.min(1,x1+pw); y1=Math.min(1,y1+ph);
+      crop.width=m.w; crop.height=m.h; const c=crop.getContext('2d');
+      c.filter=m.gray?'grayscale(1)':'none';
+      c.drawImage(v,x0*v.videoWidth,y0*v.videoHeight,(x1-x0)*v.videoWidth,(y1-y0)*v.videoHeight,0,0,m.w,m.h);
+      const copy=document.createElement('canvas'); copy.width=m.w; copy.height=m.h; copy.getContext('2d').drawImage(crop,0,0);
+      buf.push({ts:now/1000,open,crop:copy});
+      while(buf.length&&buf[0].ts<now/1000-4)buf.shift();
+      maybeFire(now/1000);
+    }
+  }
+  if(v.requestVideoFrameCallback)v.requestVideoFrameCallback(onFrame); else requestAnimationFrame(onFrame);
+}
+v.requestVideoFrameCallback? v.requestVideoFrameCallback(onFrame) : requestAnimationFrame(onFrame);
+
+// Window -> grid -> API
+function maybeFire(now){
+  const m=MODES[mode()];
+  if(now-lastFire < m.win*m.overlap) return; lastFire=now;
+  if(inFlight) return; // drop window if busy
+  if((spent[mode()]||0)>=m.cap) return;
+  if(!$('key').value.trim()){ stat.textContent='Enter your OpenRouter API key to get captions.'; return; }
+  const frames=sample(now,m); if(frames.length<m.n/2) return;
+  const opens=frames.map(f=>f.open), mean=opens.reduce((a,b)=>a+b,0)/opens.length;
+  const variance=opens.reduce((a,b)=>a+(b-mean)**2,0)/opens.length;
+  if(variance < +$('gate').value){ dot.className='h-2.5 w-2.5 rounded-full bg-amber-500'; stat.textContent='silent'; return; }
+  dot.className='h-2.5 w-2.5 rounded-full bg-emerald-500'; stat.textContent='speech — calling model…';
+  fire(frames,m);
+}
+function sample(now,m){
+  return Array.from({length:m.n},(_,i)=>{
+    const t=now-m.win+(m.win*i/(m.n-1)); let best=null,bd=1e9;
+    for(const f of buf){const d=Math.abs(f.ts-t); if(d<bd){bd=d;best=f}}
+    return best;
+  }).filter(Boolean);
+}
+async function fire(frames,m){
+  inFlight=true; const t0=performance.now();
+  const grid=document.createElement('canvas'); grid.width=m.cols*m.w; grid.height=m.rows*m.h;
+  const g=grid.getContext('2d'); frames.forEach((f,i)=>g.drawImage(f.crop,(i%m.cols)*m.w,Math.floor(i/m.cols)*m.h));
+  const url=grid.toDataURL('image/jpeg',m.q);
+  const sys=`You are an expert lip reader. The image is a grid of mouth crops from one speaker, in time order left-to-right, top-to-bottom, covering about ${m.win} seconds. Many mouth shapes are ambiguous (p/b/m, f/v, t/d/n, k/g). Choose the most likely words given the previous transcript. Reply only with JSON: {"words": string, "confidence": number 0-1}. If no speech is visible, return {"words": "", "confidence": 0}.`;
+  const prev=history.slice(-20).map(h=>h.w).join(' ');
+  let data; try{ data=await api([{role:'system',content:sys},{role:'user',content:[{type:'text',text:'Previous transcript: '+prev},{type:'image_url',image_url:{url}}]}]); } finally { inFlight=false; }
+  if(!data) return;
+  $('lat').textContent='latency '+Math.round(performance.now()-t0)+' ms'; stat.textContent='speech — captioned';
+  speechSec+=m.win;
+  try{const j=json(data);
+    if(j.words) j.words.split(/\s+/).filter(Boolean).forEach(w=>history.push({w,c:j.confidence??0,ts:Date.now()}));
+  }catch{/* ignore */}
+  renderCaps(); renderBudget();
+  if(mode()==='20'&&Date.now()-lastCorrect>10000){lastCorrect=Date.now(); correct();}
+}
+async function api(messages,maxTokens=40){
+  if(backoff>0){await new Promise(r=>setTimeout(r,backoff)); backoff=0;}
+  let res; try{ res=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+$('key').value.trim()},
+    body:JSON.stringify({model:$('model').value.trim(),temperature:0,max_tokens:maxTokens,response_format:{type:'json_object'},usage:{include:true},reasoning:{effort:'low'},messages})}); }
+  catch(e){ stat.textContent='Network error — could not reach OpenRouter.'; return null; }
+  if(res.status===429){backoff=Math.min(30000,(backoff||1000)*2); stat.textContent='rate limited, backing off…'; return null;}
+  if(!res.ok){ const err=await res.json().catch(()=>({})); stat.textContent='API error '+res.status+(err.error?.message?': '+err.error.message:''); return null; }
+  const data=await res.json(), u=data.usage||{};
+  const cost=u.cost ?? ((u.prompt_tokens||0)*.10/1e6+(u.completion_tokens||0)*.50/1e6);
+  spent[mode()]=(spent[mode()]||0)+cost; calls++; persist(); renderBudget();
+  return data;
+}
+async function correct(){
+  const recent=history.filter(h=>Date.now()-h.ts<30000); if(recent.length<5)return;
+  const data=await api([{role:'system',content:'You are an editor. Return only JSON: {"words": string}. Return a corrected, fluent version of the transcript span, preserving meaning.'},{role:'user',content:recent.map(h=>h.w).join(' ')}],200);
+  try{const txt=json(data).words;
+    if(txt){history=history.filter(h=>Date.now()-h.ts>=30000); txt.split(/\s+/).filter(Boolean).forEach(w=>history.push({w,c:.9,ts:Date.now()})); renderCaps();}
+  }catch{}
+}
+renderBudget();
+</script>
+</body>
+</html>
